@@ -1,5 +1,5 @@
 
-# `latitude-rpg`
+# latitude-rpg
 
 A very simple text-based adventure written to demonstrate usage of
 the
