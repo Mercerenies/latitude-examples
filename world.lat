@@ -1,0 +1,90 @@
+;;* MODULE world
+;;* PACKAGE rpg-example
+
+;; This module uses the 'game module's builder techniques to build the
+;; game world.
+
+;; We explicitly import the 'game module here. If this is being run
+;; from main.lats, then the main file has already loaded the module.
+;; Modules will not be reloaded, so the module object that already
+;; exists in memory will be returned. However, it is good to include
+;; imports like this for future-proofing and documentation purposes.
+use 'game import '[Area].
+
+world := $whereAmI.
+
+;; Note that we do not attach the individual areas to the 'world
+;; object, so those names will not be exported. The only name which
+;; will be exported is 'start. Strictly speaking, these "private"
+;; names such as 'grassland and 'forest are still accessible via a
+;; convoluted chain of calls*, as nothing in Latitude is truly private.
+;;
+;; * "#'(world start desc) closure parent grassland" will access the
+;;   "private" grassland object, but writing code like that will cause
+;;   you to question your sanity.
+
+grassland := Area make {
+  name "Grassland".
+  desc "A grassy knoll. There's a forest to the south.".
+  exit 'south to { forest. }.
+  item 'sword.
+}.
+
+forest := Area make {
+
+  name "Forest".
+  ;; Here, rather than defining the description to be a simple string,
+  ;; we define it to be a method which computes the current
+  ;; description based on the state of the game and in particular the
+  ;; state of the forest.
+  desc {
+    start := "A dense forest. There's a grassy area to the north".
+    end := if (self cleared) then {
+        " and a path to the west.".
+      } else {
+        ". The treeline becomes impenetrable to the west. " ++
+          "You could probably cut the trees if you had a weapon.".
+      }.
+      start ++ end.
+  }.
+
+  exit 'north to { grassland. }.
+  exit 'west to { beach. } when { self cleared. }.
+
+  ;; This will cause the forest area to have an overriden 'attack
+  ;; method which performs the work described in the below block.
+  attack {
+    localize.
+    takes '[target, weapon].
+    targets := '[trees, treeline, tree].
+    cond {
+      when (targets find (target) not) do {
+        stdout putln: "I don't know how to do that.".
+      }.
+      when (weapon nil?) do {
+        stdout putln: "Attack " ++ target pretty ++ " with what?".
+      }.
+      when (weapon /= 'sword) do {
+        stdout putln: "I don't know how to do that.".
+      }.
+      else {
+        stdout putln: "You slice through the thick treeline.".
+        this cleared := True.
+      }.
+    }.
+  }.
+
+  self cleared := False.
+
+}.
+
+beach := Area make {
+  name "Beach".
+  desc: "A serene beach. There's a forest to the east. " ++
+    "Congratulations! You've reached the end of this short demo!".
+  exit 'east to { forest. }.
+}.
+
+world start := forest.
+
+world.

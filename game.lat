@@ -1,0 +1,540 @@
+;;* MODULE game
+;;* PACKAGE rpg-example
+
+;; This module defines three classical objects, one mixin object, and
+;; two singleton objects. Remember that, in Latitude, every object is
+;; equal, so there is no distinction between classical, mixin, and
+;; singleton objects according to the language or the VM. The only
+;; distinction is in how we use them.
+
+;; The 'format module is in the standard library and provides printf
+;; functionality. Specifically, we would like to use the ~fmt sigil to
+;; construct format strings, so we import the module's sigils into the
+;; current scope.
+use 'format importAllSigils.
+
+;; When we load a module, the dynamic variable $whereAmI is set to a
+;; newly constructed module object. We assign that module object to a
+;; more conveniently accessible lexical name. This is a common
+;; paradigm that almost every Latitude module uses.
+game := $whereAmI.
+
+;; We define a new object called Exit, for exits to the current area
+;; on the map. Using ::= rather than := gives us a convenient toString
+;; method automatically. An exit has a path, which is a symbol
+;; indicating its direction, such as 'north or 'south. An exit also
+;; has a target, which is (a method returning) the destination at the
+;; other end of the exit, and a condition which determines whether or
+;; not the exit can be visited.
+Exit ::= Object clone tap {
+
+  ;; 'tap is a frequently-used method in Latitude. It performs some
+  ;; work on the calling object and then returns the caller. Within
+  ;; this block of code, 'self is equal to the newly cloned object
+  ;; defined above. As the end of this block, that same object is
+  ;; returned and assigned to the Exit name.
+
+  self path := Nil.
+
+  self target := { }.
+
+  self condition := True.
+
+  ;; In Latitude, the usual means to construct a subobject is via the
+  ;; clone method. In many cases, the clone method must do some work
+  ;; in addition to simply cloning the object in order to leave the
+  ;; new object in a valid state. If the construction of a new object
+  ;; takes arguments or must perform nontrivial work, it is often
+  ;; useful to define an explicit constructor. Latitude does not have
+  ;; a notion of constructors in the usual sense, but the convention
+  ;; is to define a method called 'make which calls the clone method
+  ;; and then does some additional work on the returned object.
+  self make := {
+    ;; Arguments are normally passed in dynamic variables named $1,
+    ;; $2, $3, etc. Often, we want these arguments to be placed in
+    ;; lexical variables instead. 'takes is a metamethod which does
+    ;; just that. In this case, we take the first two arguments and
+    ;; place them in variables named 'path and 'target. If there are
+    ;; more than two arguments, the later arguments are ignored, and
+    ;; if there are too few, then the argument list is padded with
+    ;; Nil.
+    takes '[path, target].
+    self clone tap {
+      self path := path.
+      ;; The #' syntax will force methods to not be evaluated.
+      ;; Normally, if 'target was a method, it would be evaluated and
+      ;; the result would be assigned to self's 'target slot. However,
+      ;; we would like to actually assign the *method* itself, not its
+      ;; result, to the slot, so we block its evaluation.
+      self target := #'(target).
+    }.
+  }.
+
+  ;; The name Exit is only defined in the local scope above, but we
+  ;; want to export it. The game module object, declared above, will
+  ;; eventually be returned from this file, so anything we attach to
+  ;; that object will be available to other modules and scripts.
+  game Exit := self.
+
+}.
+
+;; Here, we define our first (and in this case only) mixin object.
+;; Mixins can be injected into other objects in order to replicate the
+;; functionality of the mixin, allowing for a convenient, albeit
+;; slightly limited, form of multiple inheritance.
+ItemHolder ::= Mixin clone tap {
+
+  ;; We're generating a symbol here, so that we can safely store a
+  ;; reference to the injected object later. If we used a pre-defined
+  ;; name, there would be a risk of overlapping with a name that is
+  ;; being used for something else, but because we generate a fresh
+  ;; symbol, it is guaranteed that this symbol will only ever be used
+  ;; for this exact purpose.
+  injector := Symbol gensym.
+
+  ;; Because mixins are injected into other objects rather than simply
+  ;; being parents of them, we must explicitly specify which methods
+  ;; we would like to be injected into the objects.
+  self interface := '[clone, hasItem?, addItem, removeItem].
+
+  ;; Mixins are injected using the inject method. We override that
+  ;; method and add a bit of additional behavior. In particular, the
+  ;; behavior that we add stores a reference to the injected object
+  ;; using that generated symbol we made earlier, as well as defining
+  ;; an 'items slot containing an array. If we had simply put 'items
+  ;; in the public 'interface slot of the mixin then every ItemHolder
+  ;; object would share the same inventory. By doing it here
+  ;; explicitly, we guarantee that every ItemHolder has a distinct
+  ;; inventory.
+  self inject := {
+
+    ;; This pattern is like the super() keyword in many other
+    ;; languages. We call "Parents above" to get the super method,
+    ;; then we call the super method and do some additional work on
+    ;; the returned value.
+    Parents above (parent self, 'inject) call tap {
+
+      ;; 'inject always returns the injector object, which is used to
+      ;; add the mixin functionality to another object. We add some
+      ;; slots to that injector object. In particular, we use 'slot=
+      ;; to add a slot whose key value is our unique symbol
+      ;; constructed above.
+      self items := [].
+      self slot (injector) = self.
+
+    }.
+
+  }.
+
+  ;; Here, we define the functionality that we want injected objects
+  ;; to have. This is fairly straightforward; we define it as though
+  ;; ItemHolder was an ordinary class. Its functionality will be
+  ;; duplicated in each object into which ItemHolder is injected.
+  self items := [].
+  self hasItem? := {
+    self items find ($1) toBool.
+  }.
+  self addItem := {
+    self items pushBack.
+  }.
+  self removeItem := {
+    takes '[item].
+    ;; We would like to know whether or not the item was actually
+    ;; removed, so we define a variable which will be a Boolean
+    ;; indicating just that. The 'assignable method, as the name
+    ;; indicates, makes a variable assignable using = syntax. Had we
+    ;; simply used "check := ..." inside the nested scope, a *new*
+    ;; 'check variable would've been defined inside that scope,
+    ;; leaving the original unmodified.
+    check := False.
+    assignable 'check.
+    ;; Here, we remove the first item equal to the argument item. We
+    ;; also set 'check to be the truthiness of that expression. Since
+    ;; 'removeOnce terminates as soon as it removes one element, we
+    ;; know that 'check will be given a truthy value if an element is
+    ;; actually removed.
+    self items := self items removeOnce {
+      ;; Strictly speaking, we are performing the check "item == $1".
+      ;; However, arguments are dynamic variables like any other, so
+      ;; they are forwarded to called methods if not overriden. Thus,
+      ;; the "item ==" call will inherit the $1 slot from the calling
+      ;; method.
+      check = (item ==).
+    }.
+    check.
+  }.
+  self clone := {
+    ;; Since we obviously don't want multiple objects to share an
+    ;; inventory, we will always duplicate the 'items slot whenever a
+    ;; new ItemHolder object is created.
+    Parents above (self slot (injector), 'clone) call tap {
+      self items := self items dup.
+    }.
+  }.
+
+  game ItemHolder := self.
+
+}.
+
+;; AreaBuilder is a builder object used to construct Area objects. It
+;; is used in a way that may not be immediately intuitive to those
+;; unfamiliar with Latitude. The 'make method on the Area object
+;; (defined below) will use a special calling technique which calls
+;; the block provided to the constructor in such a way that the
+;; methods defined on this object are available in the lexical scope
+;; of the call.
+AreaBuilder ::= Object clone tap {
+
+  self target := Nil.
+
+  ;; These methods are fairly basic. They simply assign a slot on the
+  ;; object being built. They are provided primarily for convenience.
+  self name := {
+    self target name := #'($1).
+  }.
+  self desc := {
+    self target desc := #'($1).
+  }.
+  self attack := {
+    self target attack := #'($1).
+  }.
+
+  ;; Here, we define a slightly more complicated method. This method
+  ;; will be called as part of a chained method call to construct an
+  ;; exit, so the resulting syntax will look like
+  ;;
+  ;;     exit 'direction to { target. } when { someCondition. }.
+  self exit := {
+    ;; 'self is bound at every method call, so using it within nested
+    ;; method calls can produce surprising results to newcomers. When
+    ;; a 'self value is desired several scope levels deep, we can use
+    ;; 'localize, which is more or less equivalent to "this := self".
+    ;; Now we have a 'this name which won't be rebound at every scope
+    ;; boundary.
+    localize.
+    takes '[path].
+    ;; To allow these chained methods to be called, a new object must
+    ;; be returned which has the 'to and 'when methods defined on it.
+    ;; If this were a more complicated chained call, we would want to
+    ;; put these methods on a new public classical object, but since
+    ;; we're only defining two methods, it won't hurt to do it inline.
+    Object clone tap {
+      self target := Nil.
+      ;; Both of these methods return 'self, allowing the chained
+      ;; calls to be performed in a fluent style. The 'to method must
+      ;; always be called first, as it is a required part of the
+      ;; initialization. The 'when method is optional and simply
+      ;; mutates the existing object. Fluent chain interfaces like
+      ;; this must always be thoroughly documented so that it is clear
+      ;; which methods are required and which must be called first.
+      self to := {
+        self target := Exit make (path, #'($1)).
+        this target exits pushBack: self target.
+        self.
+      }.
+      self when := {
+        block := #'($1).
+        self target condition := {
+          ;; 'send takes a method and executes it as though it were a
+          ;; method defined on the target object. This way, the
+          ;; argument to 'when can use its 'self field as a reference
+          ;; to the area object which is being built. This will come
+          ;; in handy for exits that are sometimes disabled, such as
+          ;; the treeline in the forest which must be cut down before
+          ;; passing.
+          this target send #'(block) call.
+        }.
+        self.
+      }.
+    }.
+  }.
+
+  ;; This method is relatively simple, but since it performs a
+  ;; mutation rather than a simple assignment, it can be called
+  ;; multiple times to add multiple items to the area.
+  self item := {
+    self target addItem ($1).
+  }.
+
+  game AreaBuilder := self.
+
+}.
+
+;; The area object represents an area in the game. It is a relatively
+;; straightforward classical object, which means that in a traditional
+;; OOP language, it would be modeled as a class.
+Area ::= Object clone tap {
+
+  self name := "Area".
+  self desc := "".
+
+  ;; There are two* stringification methods in Latitude. 'toString,
+  ;; which is given to us automatically by the ::= assignment, returns
+  ;; a machine-friendly string, while 'pretty returns a user-friendly
+  ;; string. Here, we define the "pretty" representation to be the
+  ;; actual in-game name of the area.
+  ;;
+  ;; * Technically, there is a third one, called 'stringify. This
+  ;;   method is used in '++ to concatenate strings and delegates to
+  ;;   'toString unless the object is already a string. It should very
+  ;;   seldom have to be overridden.
+  self pretty := { self name. }.
+
+  self exits := [].
+
+  ;; Since 'exits is an array and therefore mutable, we need to make
+  ;; sure we get a new copy of it when we clone an Area. Otherwise,
+  ;; every area would share a common set of exits.
+  self clone := {
+    Parents above (parent self, 'clone) call tap {
+      self exits := self exits dup.
+    }.
+  }.
+
+  ;; 'clone should always perform a minimal amount of work to get the
+  ;; cloned object into a valid, safe, and usable state. It returns an
+  ;; object which is generally identical to the parent and, in
+  ;; particular, 'clone never takes arguments. Here, we take a block
+  ;; argument (a method) and evaluate it using the AreaBuilder object
+  ;; defined above.
+  self make := {
+    takes '[block].
+    self clone tap {
+      localize.
+      ;; When sending a method via 'send, we can provide a 'by block,
+      ;; which transforms the method call into a special method call.
+      ;; When the method call is performed, after the new scoping
+      ;; objects are created but before the code begins executing, the
+      ;; 'by block executes and has a chance to modify the new scopes.
+      this send #'(block) by {
+        takes '[lex, dyn].
+        ;; We use 'dup rather than 'clone, so that the behavior of
+        ;; AreaBuilder is actually physically copied into the new
+        ;; object. We do this so that we can change the new object's
+        ;; parent, effectively injecting it into the lexical scope's
+        ;; inheritance hierarchy in a way similar to a mixin.
+        lex parent := AreaBuilder dup tap {
+          self parent := lex parent.
+          self target := this.
+        }.
+      } call.
+    }.
+  }.
+
+  self printField := {
+    ;; ~fmt is a sigil which constructs a FormatString object.
+    ;; FormatString is a procedure object (a subobject of Proc), so it
+    ;; can be called. 'printf will call this format string object so
+    ;; that the appropriate values are actually interpolated.
+    stdout printf: ~fmt "\n** ~A **", self.
+    stdout putln: self desc.
+    ;; 'visit is a method defined on the Collection mixin which
+    ;; iterates over the collection, applying the argument block to
+    ;; every element. In this case, we print out a line for every item
+    ;; at the location.
+    self items visit {
+      stdout printf: ~fmt "There is a ~A sitting to the side.", $1.
+    }.
+  }.
+
+  ;; This method will be overriden in some subobjects. For those which
+  ;; it is not, attacking does not make sense in that area.
+  self attack := {
+    stdout putln: "I don't know what that is.".
+  }.
+
+  ;; An Area can hold items, in the sense that items can be left in
+  ;; the area for the player to collect.
+  ItemHolder inject: self.
+
+  game Area := self.
+
+}.
+
+;; Player is a singleton object. There is no distinction between this
+;; and a classical object in terms of how we construct it; the only
+;; difference is that we will not clone the Player object again. Note
+;; that we don't explicitly disallow cloning, so it is still possible
+;; to "subclass" the singleton and add functionality to the
+;; subobjects.
+Player ::= Object clone tap {
+
+  ;; A player has an inventory and can therefore hold items.
+  ItemHolder inject: self.
+
+  game Player := self.
+
+}.
+
+;; Game is another singleton object. It will store and manage the
+;; current game's state, including the player and the current
+;; location.
+Game ::= Object clone tap {
+
+  self location := Nil.
+  self player := Player.
+
+  self performTurn := {
+    localize.
+    callCC {
+      escapable.
+      ;; Some commands will exit early depending on the input they
+      ;; receive. We define a dynamic variable which exits the current
+      ;; "turn" and moves on to the next one. Since this variable is
+      ;; dynamic, it can be accessed in any methods called within this
+      ;; scope.
+      $endTurn := { return (Nil). }.
+      this location printField.
+      stdout puts: "> ".
+      input := stdin readln split " ".
+      ;; We add a sentinel Nil value to the end of the input list.
+      ;; This array will be used as an argument list shortly, and
+      ;; since we don't know how many arguments to expect, we need to
+      ;; place a sentinel at the end so we know when we've hit the end
+      ;; of the argument list. Otherwise, we run the risk of
+      ;; overflowing into inherited arguments.
+      input pushBack: Nil. ; Sentinel
+      command := input nth 0 intern.
+      args := input drop 1.
+      ;; Before we blindly call the command, we make sure that it is
+      ;; whitelisted, so that the player cannot try to invoke
+      ;; arbitrary Latitude code in the game's REPL.
+      if (this Commands allCommands find (command)) then {
+        ;; Normally, procedure calls are done via 'call, which
+        ;; forwards its argument list to the procedure. 'apply, on the
+        ;; other hand, takes an iterable collection and uses that
+        ;; collection as the argument list.
+        this Commands slot (command) apply: args.
+      } else {
+        stdout putln: "I don't know how to do that.".
+      }.
+    }.
+  }.
+
+  ;; Commands is another singleton object. We define it within Game,
+  ;; as opposed to at module scope, since it is, by its nature,
+  ;; tightly coupled to the Game object. The only reason we make it a
+  ;; separate object at all is for readability purposes.
+  self Commands ::= Object clone.
+  self Commands allCommands := '[go, quit, help, take, drop, inv, attack].
+  self Commands quitter := proc { }.
+  self Commands go := proc {
+    $1 nil? ifTrue {
+      stdout putln: "Go where?".
+      $endTurn.
+    }.
+    path := $1 intern.
+    result := Game location exits detect {
+      $1 path == path.
+    }.
+    ;; Lisp programmers will be familiar with the 'cond construct. It
+    ;; is essentially equivalent to a chain of if-else-if calls. The
+    ;; first matching 'when block will be executed, and if none match
+    ;; then the 'else block will instead be executed.
+    cond {
+      when (result not) do {
+        stdout putln: "There's nothing in that direction.".
+      }.
+      when (result condition not) do {
+        stdout putln: "Can't go that way.".
+      }.
+      else {
+        Game location := result target.
+      }.
+    }.
+  }.
+  self Commands quit := proc {
+    Game Commands quitter call (Nil).
+  }.
+  self Commands take := proc {
+    $1 nil? ifTrue {
+      stdout putln: "Take what?".
+      $endTurn.
+    }.
+    item := $1 intern.
+    if { Game location removeItem (item). } then {
+      Game player addItem (item).
+      stdout putln: "Got it!".
+    } else {
+      stdout putln: "You don't see a " ++ item pretty.
+    }.
+  }.
+  self Commands drop := proc {
+    $1 nil? ifTrue {
+      stdout putln: "Drop what?".
+      $endTurn.
+    }.
+    item := $1 intern.
+    if { Game player removeItem (item). } then {
+      Game location addItem (item).
+      stdout putln: "Dropped it!".
+    } else {
+      stdout putln: "You don't have a " ++ item pretty.
+    }.
+  }.
+  self Commands inv := proc {
+    stdout putln: "Inventory:".
+    if { Game player items empty?. } then {
+      stdout putln: " (None)".
+    } else {
+      Game player items visit {
+        stdout putln: " " ++ $1 pretty.
+      }.
+    }.
+  }.
+  self Commands attack := proc {
+    takes '[something, with, object].
+    something nil? ifTrue {
+      stdout putln: "Attack what?".
+      $endTurn.
+    }.
+    something := something intern.
+    ;; Strings, including the empty string, are always truthy, so the
+    ;; only way 'with' will be falsy in this case is if it is the
+    ;; sentinel Nil value used to indicate the end of the argument
+    ;; list. By enclosing the operands to 'and in method brackets, we
+    ;; enable short-circuiting. The right-hand-side method will only
+    ;; be called if the left-hand-side method returns truthy, which is
+    ;; good since calling 'intern on the Nil object would throw an
+    ;; exception.
+    with := { with. } and { with intern. }.
+    ;; Latitude is entirely expression-oriented, so constructs like
+    ;; if-statements which would, in some other languages, not be
+    ;; usable as expressions are expressions like any other in
+    ;; Latitude.
+    object := if (with == 'with) then {
+        object intern.
+      } else {
+        Nil.
+      }.
+    ;; 'ifTrue (and its companion 'ifFalse) are convenient ways to
+    ;; perform conditionals, if both branches of the conditional are
+    ;; not required. Ordinary if-then-else statements in Latitude
+    ;; require an 'else block, but 'ifTrue and 'ifFalse only have one
+    ;; case each.
+    { object. } and { Game player hasItem? (object) not. } ifTrue {
+      stdout putln: "You don't have a " ++ object pretty.
+      $endTurn.
+    }.
+    Game location attack: something, object.
+  }.
+  self Commands help := proc {
+    stdout putln: " help - Print this message.".
+    stdout putln: " go <direction> - Move somewhere.".
+    stdout putln: " take <object> - Pick up the object.".
+    stdout putln: " drop <object> - Discard the object.".
+    stdout putln: " inv - List your inventory.".
+    stdout putln: " attack <something> with <object> - Attack something.".
+    stdout putln: " quit - Exit the game.".
+  }.
+
+  game Game := self.
+
+}.
+
+;; Files, like methods, return a value in Latitude. The value returned
+;; by a module file will be used as the module object for importing
+;; purposes. There is no explicit requirement that the object returned
+;; be the same as the module object provided in $whereAmI, but it is a
+;; good convention to follow in general.
+game.

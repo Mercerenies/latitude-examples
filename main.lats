@@ -1,0 +1,56 @@
+#!/usr/local/bin/latitude
+
+;; This is the primary entry-point into the game. It will load the
+;; modules and then perform the main game loop.
+
+;; We import the modules we need. Specifically, we import the 'game
+;; and 'world modules, which are both in the project directory. Since
+;; we use the Game name from the 'game module quite a bit, we would
+;; like to be able to use that particular name unqualified.
+use 'game import '[Game].
+use 'world.
+
+;; We initialize the location slot on the Game object (imported from
+;; 'game) to the value of the start slot, qualified in the 'world
+;; module.
+Game location := world start.
+
+;; Here, we set up a continuation to make exiting the game easy.
+;; Strictly speaking, the kill method on the Kernel object would also
+;; exit the game. However, it is often a good idea to set up a
+;; "standard" exit path, so that any thunks will still perform, as the
+;; Kernel kill method does not properly unwind the stack before
+;; exiting.
+callCC {
+
+  ;; escapable is a metamethod which defines a return slot in the
+  ;; current scope. The return slot is lexically scoped, and we need
+  ;; the game's Command singleton to be able to access it, so we set
+  ;; the Command object's quiiter slot to be a procedure which calls
+  ;; the continuation.
+  escapable.
+  Game Commands quitter := proc { return (Nil). }.
+
+  ;; The Player object in the 'game module is a singleton. We will use
+  ;; this object as the game's player, so we set the Game object's
+  ;; player slot to it. Since Player is a singleton, we could just
+  ;; reference it directly during the game, but this method is more
+  ;; future-proof. If we later wanted to make the game support
+  ;; multiple players, we could very easily change Player from a
+  ;; singleton object to a classical object and then simply make a new
+  ;; player here.
+  Game player := game Player.
+
+  ;; loop, as the name indicates, is a method which loops forever.
+  ;; Since the game's Command object knows how to exit the enclosing
+  ;; continuation, we have a means of breaking out of the loop when
+  ;; the game is over.
+  loop {
+
+    ;; We delegate control to the Game object and let it perform the
+    ;; turn.
+    Game performTurn.
+
+  }.
+
+}.
