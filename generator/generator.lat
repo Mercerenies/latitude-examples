@@ -1,0 +1,234 @@
+;;* MODULE generator
+;;* PACKAGE com.example.latitude.tutorial
+
+generator := $whereAmI.
+
+;; Python-style generator functions
+;;
+;; Example usage:
+;;
+;;     Generator make {
+;;       $yield 1.
+;;       $yield 2.
+;;     } to (Array). ; ==> [1, 2]
+
+;; Generator will be an iterator type, so we clone Iterator.
+Generator ::= Iterator clone tap {
+
+  ;; When a generator is cloned, we explicitly rebind the `end?` and
+  ;; `element` slots so that our new generator will continue to work
+  ;; even if the original is advanced. We also clone `state` so the
+  ;; two generators do not interfere with one another's states.
+  self clone := {
+    Parents above (Generator, 'clone) call tap {
+      self end? := #'(self end?).
+      self element := #'(self element).
+      self state := #'(self state) clone.
+    }.
+  }.
+
+  ;; Generator is already an iterator, so just return a clone of
+  ;; itself.
+  self iterator := { self clone. }.
+
+  ;; Generators can have state. By storing the state in the generator
+  ;; instance (rather than implicitly in the continuation), we ensure
+  ;; that generators can be cloned safely.
+  self state := Nil.
+
+  ;; Generators are read-only. The parent `Generator` object itself is
+  ;; an empty iterator, but when making new generators this position
+  ;; will change.
+  self end? := True.
+  self element := Nil.
+  self element= := {
+    err ReadOnlyError clone throwWith "Generators are read-only".
+  }.
+
+  ;; `next` will be for internal use and will compute the next element
+  ;; using the generator's provided code. For now, it doesn't do
+  ;; anything yet.
+  self next := { }.
+
+  ;; When we write an immutable iterator (an iterator where `element=`
+  ;; throws ReadOnlyError), we must explicitly override `map` from
+  ;; `Collection`, as the default implementation is written mutably.
+  self map := {
+
+    ;; Many methods will accept an arbitrary procedure object as an
+    ;; argument, which may or may not be a method. If the argument is
+    ;; a method, we risk evaluating it prematurely whenever we
+    ;; reference it. `shield` will convert a method to a
+    ;; non-evaluating procedure object while leaving alone any other
+    ;; procedures, effectively unifying the behavior for all procedure
+    ;; objects.
+    procd := #'($1) shield.
+
+    ;; The newly-constructed generator's state will be the clone of
+    ;; the current generator. The new generator will simply iterate
+    ;; through the original generator and yield each value of it,
+    ;; after calling the block argument on it.
+    Generator with (self iterator) make {
+      while { $state end? not. } do {
+        $yield: procd call ($state element).
+        $state next.
+      }.
+    }.
+
+  }.
+
+  ;; This is the most general form used for constructing generators.
+  ;; It takes a procedure object which will be the generator's block,
+  ;; as well as the state.
+  self makeWith := {
+    takes '[procd, state].
+    procd := #'procd shield.
+
+    ;; We construct the new generator using the usual "clone-tap"
+    ;; idiom.
+    self clone tap {
+
+      ;; Our generator will start off by assuming it is not at its
+      ;; end. We'll call `next` before `makeWith` returns, so if the
+      ;; generator winds up being empty, this will get corrected
+      ;; before the user sees it.
+      self end? := False.
+      self element := Nil.
+      self state := state.
+
+      ;; These next three slots (yieldStmt, resumeStmt, and runBody)
+      ;; are where the magic happens. runBody contains the full body
+      ;; of the generator, which includes the block passed in by the
+      ;; user in addition to the necessary wrappers to make it
+      ;; function as a generator. resumeStmt and yieldStmt will trade
+      ;; continuations with each other to implement the actual
+      ;; coroutine behavior of generators.
+
+      ;; yieldStmt starts off empty. It will store the exit
+      ;; continuation invoked when `$yield` is called.
+      self yieldStmt := Nil.
+
+      ;; The original resumeStmt should contain the entire generator
+      ;; body, so it invokes runBody. At the end of execution of
+      ;; runBody, we know we have "naturally" reached the end of the
+      ;; generator body, so we set `end?` to true and jump back to the
+      ;; user's code.
+      self resumeStmt := {
+        localize.
+        proc {
+          this := this runBody.
+          this end? := True.
+          this yieldStmt call: Nil.
+        }.
+      }.
+
+      ;; runBody invokes the full body of the continuation. The first
+      ;; time we call resumeStmt (to begin the iteration), we invoke
+      ;; runBody. All subsequent control jumps happen within runBody,
+      ;; with yieldStmt exiting this method and resumeStmt jumping
+      ;; back into it.
+      self runBody := {
+
+        ;; We need to not only bind `this` but make it assignable.
+        ;; `assignable` is similar to `local` except that it doesn't
+        ;; explicitly assign a value to the variable. So it defines a
+        ;; `this=` method which will reassign the `this` variable. We
+        ;; have to do this so that cloned generators will work
+        ;; correctly, as the generator block needs to be able to
+        ;; "detect" that it is now being run on a distinct object.
+        localize.
+        assignable 'this.
+
+        ;; We use dynamic variables rather than lexical ones. This is
+        ;; to allow generators to delegate to other functions which
+        ;; will still have the ability to yield values from the
+        ;; generator. Since we're using dynamic variables, we simply
+        ;; have to define them in scope here and the generator body
+        ;; will inherit them. If we were using lexical variables, we
+        ;; would need to use `send ... by`
+
+        ;; When `$yield` is called within the procedure body, we exit
+        ;; the body and jump back to the point in the user's code from
+        ;; which we previously resumed the generator.
+        $yield := {
+          takes '[result].
+          this = callCC {
+            ;; Next time, we want to resume from this point, so we
+            ;; rebind resumeStmt. Then we call yieldStmt, which jumps
+            ;; back to the user's code.
+            this resumeStmt := $1.
+            this yieldStmt call: result.
+          }.
+        }.
+        ;; `$state` is a dynamic method, so it will delegate to the
+        ;; generator's state.
+        $state := { this state. }.
+
+        ;; Now that we've set up our environment, it's time to
+        ;; actually call the body.
+        procd call.
+
+        ;; At the end, we return the "final" value of `this`. If we
+        ;; cloned the generator at some point, this could very
+        ;; possibly not be the same as the "initial" value. When we
+        ;; return from `runBody`, we'll be setting `this end?` to true, so we
+        ;; need to make sure we're setting that on the right object.
+        this.
+
+      }.
+
+      ;; As an iterator, a generator needs to have a `next` method.
+      ;; This will rebind the `element` slot to be the next element of
+      ;; the generator body, as determined by resuming the generator
+      ;; call.
+      self next := {
+        localize.
+        this element := callCC {
+          ;; When we next yield, we want to jump back to this point in
+          ;; the code, so we set `yieldStmt` to be a continuation
+          ;; object which will do just that.
+          this yieldStmt := $1.
+          ;; Now we resume the body. More than likely, this call will
+          ;; never return. In most cases, the yieldStmt continuation
+          ;; will get called and we'll jump to the end of this block.
+          ;; But if we reach the end of the generator body, this
+          ;; method will return Nil, so we'll set `this element` to
+          ;; it.
+          this element := this resumeStmt call: this.
+          Nil.
+        }.
+      }.
+
+      ;; As of right now, the generator has not been initialized. It's
+      ;; time to fix that. As soon as the generator is constructed, we
+      ;; run it up to its first `$yield` statement (or the end of the
+      ;; block, whichever happens first).
+      self next.
+
+    }.
+
+  }.
+
+  ;; To make construction more convenient, we allow two forms that
+  ;; delegate to the more unwieldy `makeWith`.
+  ;;
+  ;;     Generator with (state) make { body. }.
+  ;;     Generator make { body. }.
+  ;;
+  ;; The latter has Nil state.
+  self with := {
+    takes '[arg].
+    self clone tap {
+      self make := { self makeWith (#'$1, #'arg). }.
+    }.
+  }.
+
+  self make := {
+    self makeWith (#'$1, Nil).
+  }.
+
+}.
+
+generator Generator := Generator.
+
+$whereAmI.

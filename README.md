@@ -6,3 +6,4 @@ the
 [Latitude programming language](https://github.com/Mercerenies/latitude).
 
  * `rpg/` A short text-based adventure
+ * `generator/` Python-style generators

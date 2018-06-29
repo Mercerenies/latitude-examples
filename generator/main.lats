@@ -1,0 +1,25 @@
+#!/usr/local/bin/latitude
+
+use 'generator import '[Generator].
+
+state := Object clone tap {
+  self clone := {
+    Parents above (state, 'clone) call tap {
+      self i := self i.
+    }.
+  }.
+  self i := 1.
+}.
+
+gen := Generator with (state clone) make {
+  i := { $state i. }.
+  i= := { $state i := $1. }.
+  while { i < 10. } do {
+    $yield (i).
+    i = i + 1.
+  }.
+}.
+
+println: gen to (Array).
+println: gen map { $1 * 10. } to (Array).
+println: gen to (Array).
