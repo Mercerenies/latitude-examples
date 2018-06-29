@@ -1,0 +1,42 @@
+#!/usr/local/bin/latitude
+
+;; We'll be using the 'random and 'format modules for this example.
+use 'random.
+use 'format importAllSigils.
+
+;; `nextInt` from the 'random module generates a random integer. The
+;; magnitude of the resulting integer is generally unspecified, so we
+;; will almost always want to perform a modulo operation on it
+;; immediately.
+correct := random nextInt mod 100.
+local 'guesses = 0.
+
+;; We're using `loop*` here so we can artificially exit the loop when
+;; the user makes a correct guess.
+loop* {
+  guesses = guesses + 1.
+  puts: "Enter a number: ".
+  guess := $stdin readln toInt.
+
+  ;; `cond` works like a sequence of if-else-if statements. The first
+  ;; expression which is truthy will have its body evaluated, and then
+  ;; the conditional expression will terminate.
+  cond {
+    when (guess > correct) do {
+      putln: "Too high!".
+    }.
+    when (guess < correct) do {
+      putln: "Too low!".
+    }.
+    else {
+      putln: "You got it!".
+      ;; `last` is defined by the `loop*` expression and will exit the
+      ;; loop.
+      last.
+    }.
+  }.
+}.
+
+;; We use a format string to interpolate the variable into the output.
+;; The ~A in the string will be replaced with the number of guesses.
+$stdout printf: ~fmt "It took you ~A guesses.", guesses.
