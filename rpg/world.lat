@@ -1,5 +1,5 @@
 ;;* MODULE world
-;;* PACKAGE rpg-example
+;;* PACKAGE com.mercerenies.latitude.tutorial
 
 ;; This module uses the 'game module's builder techniques to build the
 ;; game world.

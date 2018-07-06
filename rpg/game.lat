@@ -1,5 +1,5 @@
 ;;* MODULE game
-;;* PACKAGE rpg-example
+;;* PACKAGE com.mercerenies.latitude.tutorial
 
 ;; This module defines three classical objects, one mixin object, and
 ;; two singleton objects. Remember that, in Latitude, every object is

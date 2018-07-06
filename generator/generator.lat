@@ -1,5 +1,5 @@
 ;;* MODULE generator
-;;* PACKAGE com.example.latitude.tutorial
+;;* PACKAGE com.mercerenies.latitude.tutorial
 
 generator := $whereAmI.
 
