@@ -2,7 +2,18 @@
 
 use 'generator import '[Generator].
 
+;; If our generator depends on outside state (such as a
+;; lexically-enclosed variable i), then cloning the generator will
+;; produce a new generator which shares state with the old one. If you
+;; plan for your generator to be single-pass, you don't need to take
+;; this extra precaution, as you can just use an ordinary variable.
+;; However, we want our generator to be cloneable, so we'll be storing
+;; the iteration variable i in a special state object.
 state := Object clone tap {
+  ;; When we clone a generator, we also clone its inner state. When
+  ;; this state is cloned, we want the i variable to be explicitly
+  ;; copied to the child, to ensure that the parent and child to
+  ;; explicitly not share any state.
   self clone := {
     Parents above (state, 'clone) call tap {
       self i := self i.
@@ -11,15 +22,31 @@ state := Object clone tap {
   self i := 1.
 }.
 
+;; Now we make the actual generator. It's going to depend on (a clone
+;; of) our state object.
 gen := Generator with (state clone) make {
+  ;; Inside the generator, we refer to the state object by $state.
+  ;; This way, if we clone the generator, $state can be updated
+  ;; dynamically to reflect the new state. We define methods `i` and
+  ;; `i=` to make accessing the state's counter variable intuitive, so
+  ;; we aren't littering `$state i` all over the code.
   i := { $state i. }.
   i= := { $state i := $1. }.
+  ;; Now that we have the framework set up, we write our loop like we
+  ;; normally would. Every time we $yield, the generator produces an
+  ;; element. This may look like overkill for a four-line loop.
+  ;; However, if your generator was thirty lines long and delegated to
+  ;; other functions, the few lines of setting up the state may begin
+  ;; to seem somewhat more trivial.
   while { i < 10. } do {
     $yield (i).
     i = i + 1.
   }.
 }.
 
+;; To show that the generator is cloneable, we print it several times.
+;; One of these times, we apply a function to each element before
+;; converting to an array.
 println: gen to (Array).
 println: gen map { $1 * 10. } to (Array).
 println: gen to (Array).
