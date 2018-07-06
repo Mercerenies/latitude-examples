@@ -326,21 +326,21 @@ Area ::= Object clone tap {
     ;; FormatString is a procedure object (a subobject of Proc), so it
     ;; can be called. 'printf will call this format string object so
     ;; that the appropriate values are actually interpolated.
-    stdout printf: ~fmt "\n** ~A **", self.
-    stdout putln: self desc.
+    $stdout printf: ~fmt "\n** ~A **", self.
+    $stdout putln: self desc.
     ;; 'visit is a method defined on the Collection mixin which
     ;; iterates over the collection, applying the argument block to
     ;; every element. In this case, we print out a line for every item
     ;; at the location.
     self items visit {
-      stdout printf: ~fmt "There is a ~A sitting to the side.", $1.
+      $stdout printf: ~fmt "There is a ~A sitting to the side.", $1.
     }.
   }.
 
   ;; This method will be overriden in some subobjects. For those which
   ;; it is not, attacking does not make sense in that area.
   self attack := {
-    stdout putln: "I don't know what that is.".
+    $stdout putln: "I don't know what that is.".
   }.
 
   ;; An Area can hold items, in the sense that items can be left in
@@ -385,8 +385,8 @@ Game ::= Object clone tap {
       ;; scope.
       $endTurn := { return (Nil). }.
       this location printField.
-      stdout puts: "> ".
-      input := stdin readln split " ".
+      $stdout puts: "> ".
+      input := $stdin readln split " ".
       ;; We add a sentinel Nil value to the end of the input list.
       ;; This array will be used as an argument list shortly, and
       ;; since we don't know how many arguments to expect, we need to
@@ -406,7 +406,7 @@ Game ::= Object clone tap {
         ;; collection as the argument list.
         this Commands slot (command) apply: args.
       } else {
-        stdout putln: "I don't know how to do that.".
+        $stdout putln: "I don't know how to do that.".
       }.
     }.
   }.
@@ -420,7 +420,7 @@ Game ::= Object clone tap {
   self Commands quitter := proc { }.
   self Commands go := proc {
     $1 nil? ifTrue {
-      stdout putln: "Go where?".
+      $stdout putln: "Go where?".
       $endTurn.
     }.
     path := $1 intern.
@@ -433,10 +433,10 @@ Game ::= Object clone tap {
     ;; then the 'else block will instead be executed.
     cond {
       when (result not) do {
-        stdout putln: "There's nothing in that direction.".
+        $stdout putln: "There's nothing in that direction.".
       }.
       when (result condition not) do {
-        stdout putln: "Can't go that way.".
+        $stdout putln: "Can't go that way.".
       }.
       else {
         Game location := result target.
@@ -448,44 +448,44 @@ Game ::= Object clone tap {
   }.
   self Commands take := proc {
     $1 nil? ifTrue {
-      stdout putln: "Take what?".
+      $stdout putln: "Take what?".
       $endTurn.
     }.
     item := $1 intern.
     if { Game location removeItem (item). } then {
       Game player addItem (item).
-      stdout putln: "Got it!".
+      $stdout putln: "Got it!".
     } else {
-      stdout putln: "You don't see a " ++ item pretty.
+      $stdout putln: "You don't see a " ++ item pretty.
     }.
   }.
   self Commands drop := proc {
     $1 nil? ifTrue {
-      stdout putln: "Drop what?".
+      $stdout putln: "Drop what?".
       $endTurn.
     }.
     item := $1 intern.
     if { Game player removeItem (item). } then {
       Game location addItem (item).
-      stdout putln: "Dropped it!".
+      $stdout putln: "Dropped it!".
     } else {
-      stdout putln: "You don't have a " ++ item pretty.
+      $stdout putln: "You don't have a " ++ item pretty.
     }.
   }.
   self Commands inv := proc {
-    stdout putln: "Inventory:".
+    $stdout putln: "Inventory:".
     if { Game player items empty?. } then {
-      stdout putln: " (None)".
+      $stdout putln: " (None)".
     } else {
       Game player items visit {
-        stdout putln: " " ++ $1 pretty.
+        $stdout putln: " " ++ $1 pretty.
       }.
     }.
   }.
   self Commands attack := proc {
     takes '[something, with, object].
     something nil? ifTrue {
-      stdout putln: "Attack what?".
+      $stdout putln: "Attack what?".
       $endTurn.
     }.
     something := something intern.
@@ -513,19 +513,19 @@ Game ::= Object clone tap {
     ;; require an 'else block, but 'ifTrue and 'ifFalse only have one
     ;; case each.
     { object. } and { Game player hasItem? (object) not. } ifTrue {
-      stdout putln: "You don't have a " ++ object pretty.
+      $stdout putln: "You don't have a " ++ object pretty.
       $endTurn.
     }.
     Game location attack: something, object.
   }.
   self Commands help := proc {
-    stdout putln: " help - Print this message.".
-    stdout putln: " go <direction> - Move somewhere.".
-    stdout putln: " take <object> - Pick up the object.".
-    stdout putln: " drop <object> - Discard the object.".
-    stdout putln: " inv - List your inventory.".
-    stdout putln: " attack <something> with <object> - Attack something.".
-    stdout putln: " quit - Exit the game.".
+    $stdout putln: " help - Print this message.".
+    $stdout putln: " go <direction> - Move somewhere.".
+    $stdout putln: " take <object> - Pick up the object.".
+    $stdout putln: " drop <object> - Discard the object.".
+    $stdout putln: " inv - List your inventory.".
+    $stdout putln: " attack <something> with <object> - Attack something.".
+    $stdout putln: " quit - Exit the game.".
   }.
 
   game Game := self.

@@ -59,16 +59,16 @@ forest := Area make {
     targets := '[trees, treeline, tree].
     cond {
       when (targets find (target) not) do {
-        stdout putln: "I don't know how to do that.".
+        $stdout putln: "I don't know how to do that.".
       }.
       when (weapon nil?) do {
-        stdout putln: "Attack " ++ target pretty ++ " with what?".
+        $stdout putln: "Attack " ++ target pretty ++ " with what?".
       }.
       when (weapon /= 'sword) do {
-        stdout putln: "I don't know how to do that.".
+        $stdout putln: "I don't know how to do that.".
       }.
       else {
-        stdout putln: "You slice through the thick treeline.".
+        $stdout putln: "You slice through the thick treeline.".
         this cleared := True.
       }.
     }.
