@@ -227,8 +227,8 @@ Generator ::= Iterator clone tap {
     self makeWith (#'$1, Nil).
   }.
 
-}.
+  generator Generator := self.
 
-generator Generator := Generator.
+}.
 
 $whereAmI.
