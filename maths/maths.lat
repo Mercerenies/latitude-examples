@@ -24,8 +24,8 @@ maths fibonacci := {
 
 maths prime? := {
   takes '[n].
-  if (n == 2) then {
-    True.
+  if (n <= 2) then {
+    n == 2.
   } else {
     2 upto (n ^ (1 / 2) + 1) notAny { n mod ($1) == 0. }.
   }.
