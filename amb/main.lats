@@ -1,0 +1,26 @@
+#!/usr/local/bin/latitude
+
+use 'amb import '[callAmb].
+
+;; We begin a callAmb block, which will backtrack and move about
+;; within itself until it finds values which satisfy all of the
+;; constraints. We could just as easily have written the 'amb module
+;; without the callAmb method, so that the entire program can call
+;; $amb and backtrack to any other $amb point. However, allowing such
+;; arbitrary backtracking is likely undesired and error-prone, so we
+;; define local amb blocks with callAmb. Then backtracking will never
+;; cause a continuation jump outside of the block.
+result := callAmb {
+  ;; This reads "let x be each of the values 1, 2, and 3; keep trying
+  ;; until we find one that works". Then we do the same thing with y.
+  x := $amb [1, 2, 3].
+  y := $amb [2, 3, 4].
+  ;; If x times y is not equal to 8, then fail the amb block. This
+  ;; adds a condition and requires that valid x and y values must
+  ;; satisfy x * y == 8.
+  (x * y == 8) ifFalse { $fail. }.
+  ;; Once we've found valid values, we return a dictionary listing
+  ;; those values.
+  [ 'x => x, 'y => y ].
+}.
+println: result.

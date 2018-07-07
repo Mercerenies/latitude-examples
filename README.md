@@ -9,3 +9,4 @@ the
  * `generator/` Python-style generators
  * `guess/` A simple guessing game
  * `maths/` Miscellaneous mathematical functions
+ * `amb/` McCarthy's amb operator
