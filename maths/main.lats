@@ -1,0 +1,13 @@
+#!/usr/local/bin/latitude
+
+use 'maths importAll.
+
+putln: "3! = " ++ factorial 3.
+putln: "5! = " ++ factorial 5.
+
+putln: "Fibonacci sequence: " ++ fibonacci 10 join ", " ++ " ...".
+
+putln: "101 is prime? " ++ prime? 101.
+putln: "999 is prime? " ++ prime? 999.
+
+putln: "Prime numbers: " ++ primes take 10 join ", " ++ " ...".

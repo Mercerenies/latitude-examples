@@ -1,0 +1,38 @@
+;;* MODULE maths
+;;* PACKAGE com.mercerenies.latitude.tutorial
+
+maths := $whereAmI.
+
+use 'sequence import '[LazySequence].
+
+maths factorial := {
+  1 upto ($1 + 1) product.
+}.
+
+maths fibonacci := {
+  takes '[n].
+  arr := [0, 1].
+  if (n > 2) then {
+    (n - 2) times do {
+      arr pushBack: arr nth (-2) + arr nth (-1).
+    }.
+    arr.
+  } else {
+    arr take (n) to (Array).
+  }.
+}.
+
+maths prime? := {
+  takes '[n].
+  if (n == 2) then {
+    True.
+  } else {
+    2 upto (n ^ (1 / 2) + 1) notAny { n mod ($1) == 0. }.
+  }.
+}.
+
+maths primes := {
+  LazySequence iterate (2, { $1 + 1. }) filter { maths prime?. }.
+}.
+
+maths.
