@@ -6,13 +6,22 @@ maths := $whereAmI.
 use 'sequence import '[LazySequence].
 
 maths factorial := {
+  ;; The factorial method in Latitude is fairly simple. We produce a
+  ;; range object containing the numbers from 1 to the argument n
+  ;; (inclusive) and take the product. `product` is a method built in
+  ;; to the collection mixin, so it will work on any collection of
+  ;; numbers.
   1 upto ($1 + 1) product.
 }.
 
 maths fibonacci := {
   takes '[n].
+  ;; The Fibonacci sequence begins with two starting conditions. If n
+  ;; <= 2, simply return (a sublist of) the starting conditions.
   arr := [0, 1].
   if (n > 2) then {
+    ;; In the (usual) case where n > 2, iterate and push elements back
+    ;; onto the array.
     (n - 2) times do {
       arr pushBack: arr nth (-2) + arr nth (-1).
     }.
@@ -24,14 +33,24 @@ maths fibonacci := {
 
 maths prime? := {
   takes '[n].
+  ;; We hard code in that 2 is prime. Then, if the input is greater
+  ;; than 2, we iteratively test.
   if (n <= 2) then {
     n == 2.
   } else {
+    ;; For every value from 2 up to and including sqrt(n), see if that
+    ;; number divides n. If so, n is not prime.
     2 upto (n ^ (1 / 2) + 1) notAny { n mod ($1) == 0. }.
   }.
 }.
 
 maths primes := {
+  ;; LazySequence is an infinite collection type. Here, we use
+  ;; `iterate` to produce an infinite sequence of all integers greater
+  ;; than 1. Then we filter it based on which integers are prime. This
+  ;; returns an iterator. Calling `to (Array)` on this sequence would
+  ;; be less than desirable, as the sequence is infinite. To get the
+  ;; first n primes, call `take (n)` on the result of this method.
   LazySequence iterate (2, { $1 + 1. }) filter { maths prime?. }.
 }.
 
