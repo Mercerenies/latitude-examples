@@ -4,13 +4,15 @@
 amb := $whereAmI.
 
 ;; McCarthy's 'amb' operator
+;;
 ;; Example usage:
-;; callAmb {
-;;   x := $amb [1, 2, 3].
-;;   y := $amb [2, 4, 6].
-;;   (x * y == 8) ifFalse { $amb []. }.
-;;   [x, y].
-;; }.
+;;
+;;     callAmb {
+;;       x := $amb [1, 2, 3].
+;;       y := $amb [2, 4, 6].
+;;       (x * y == 8) ifFalse { $amb []. }.
+;;       [x, y].
+;;     }.
 
 ;; This is the exception that will be thrown if an amb expression is
 ;; unsatisfiable.
