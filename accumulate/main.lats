@@ -1,0 +1,40 @@
+#!/usr/local/bin/latitude
+
+use 'accumulate import '[accumulate].
+
+;; This helper function can pass information back to the accumulating
+;; collection since dynamically scoped variables are visible even
+;; within called methods.
+countToN := {
+  takes '[n].
+  ;; We'll loop from 1 up to (but excluding) n+1. $tellAll is
+  ;; inherited from the caller and can take any collection object, in
+  ;; this case a range.
+  $tellAll: 1 upto (n + 1).
+}.
+
+;; Now we run the actual accumulation block.
+result := accumulate (Array) do {
+  ;; First, let's make sure it works.
+  $tell: "Starting to count!".
+  ;; Now let's call our helper. The dynamic methods defined by the
+  ;; `accumulate` method are inherited automatically, so we don't
+  ;; explicitly need to pass them as arguments.
+  countToN (10).
+  ;; Now we'll end it off.
+  $tell: "Done counting.".
+}.
+;; Now we're going to print each collected element on a separate line.
+;; `println` will inherit the $1 argument from the `visit` block.
+;; Argument inheritance is frequently used to delegate one method call
+;; to another.
+result visit { println. }.
+
+;; Dictionaries are also buildable, so let's construct one of those
+;; using an accumulator block.
+dict := accumulate (Dict) do {
+  $tell: cons ('foo, 1).
+  $tell: cons ('bar, 2).
+  $tell: cons ('baz, 3).
+}.
+println: dict.

@@ -10,3 +10,4 @@ the
  * `guess/` A simple guessing game
  * `maths/` Miscellaneous mathematical functions
  * `amb/` McCarthy's amb operator
+ * `accumulate/` An accumulation interface to collection builders

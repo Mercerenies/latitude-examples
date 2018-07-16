@@ -1,0 +1,38 @@
+;;* MODULE accumulate
+;;* PACKAGE com.mercerenies.latitude.tutorial
+
+accumulate := $whereAmI.
+
+;; Accumulator, similar to Haskell's Writer monad
+;; Example usage:
+;;
+;;     accumulate (Array) do {
+;;       tell 1.
+;;       tell 2.
+;;       tell 3.
+;;     }. ;; Results in [1, 2, 3]
+
+accumulateMethod := {
+  ;; We would like our accumulator to be able to construct any
+  ;; buildable object type. So from our argument, we will construct a
+  ;; builder.
+  builder := $1 builder.
+  Object clone tap {
+    self do := {
+      ;; These dynamically scoped variables will be visible from the
+      ;; block's scope, so the caller of `accumulate` can use them.
+      $tell := { builder append. }.
+      $tellAll := { $1 visit { builder append. }. }.
+      #'($1) call.
+      ;; When the builder receives the `finish` message, it will
+      ;; finish building the object and return a completed collection.
+      ;; After this, the builder can no longer be used to append
+      ;; further elements.
+      builder finish.
+    }.
+  }.
+}.
+
+accumulate accumulate := #'(accumulateMethod).
+
+accumulate.
