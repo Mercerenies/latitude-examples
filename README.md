@@ -5,9 +5,12 @@ Several example programs written in
 the
 [Latitude programming language](https://github.com/Mercerenies/latitude).
 
- * `rpg/` A short text-based adventure
- * `generator/` Python-style generators
- * `guess/` A simple guessing game
+These are the examples available in this repository, roughly sorted
+from simplest to most complex.
+
  * `maths/` Miscellaneous mathematical functions
- * `amb/` McCarthy's amb operator
+ * `guess/` A simple guessing game
+ * `rpg/` A short text-based adventure
  * `accumulate/` An accumulation interface to collection builders
+ * `amb/` McCarthy's amb operator
+ * `generator/` Python-style generators
